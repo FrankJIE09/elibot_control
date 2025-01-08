@@ -3,11 +3,15 @@ import json
 import time
 
 
-class RobotController:
+class CPSClient:
     def __init__(self, ip, port=8055):
         self.ip = ip
         self.port = port
         self.sock = None
+        ret = self.connect()
+        if not ret == True:
+            RuntimeError
+
 
     def connect(self):
         try:
@@ -93,14 +97,11 @@ class RobotController:
 
     def alignZAxis(self):
         # Get the current TCP pose
-        current_pose = self.read_pos()
-
+        current_pose = self.getTcpPos()
+        current_pose[3:] = [180, 0, 0]
+        target_pose = current_pose
         # Define a target pose with the desired orientation for Z-axis alignment
         # Here, we assume the orientation is given as Euler angles in degrees
-        target_pose = {
-            "position": current_pose["position"],  # Keep the current position
-            "orientation": [180, 0, 0]  # Set orientation to align the Z-axis
-        }
 
         # Convert target orientation to the robot's required format if needed
         # This might involve converting Euler angles to quaternions, etc., depending on the robot
@@ -111,13 +112,9 @@ class RobotController:
         # Move to the calculated joint positions
         self.moveByJoint(iK_joint, speed=10)
 
+
 if __name__ == "__main__":
     robot_ip = "192.168.11.8"
-    controller = RobotController(robot_ip)
+    controller = CPSClient(robot_ip)
     if controller.connect():
-        print(controller.getTcpPos())
-        print(controller.getJointPos())
-        pose = controller.getTcpPos()
-        pose[2] = pose[2] + 10
-        print(controller.inverseKinematic(targetPose=pose))
-        controller.moveLine(pose)
+        controller.alignZAxis()
