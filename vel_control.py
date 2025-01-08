@@ -202,29 +202,6 @@ def main():
 
         # 获取机器人当前关节位置
         suc, joint_pos, _ = getJointPos(sock)
-        # if suc:
-        #     print("Current Joint Position:", joint_pos)
-        #
-        #     # 确保 joint_pos 是列表类型
-        #     if isinstance(joint_pos, str):
-        #         joint_pos = json.loads(joint_pos)
-        #
-        #     # 获取当前位置的Z轴坐标并确保它是一个数字类型（float）
-        #     joint3 = float(joint_pos[2])  # 假设 joint_pos 是 [x, y, z, rx, ry, rz]
-        #
-        #     # 增加Z轴10
-        #     new_joint3 = joint3 + 10
-        #     print(f"Moving joint3 from {joint3} to {new_joint3}")
-        #
-        #     # 创建新的目标位置，将Z轴增加10
-        #     new_joint_pos = joint_pos.copy()  # 使用copy()来生成新的列表
-        #     new_joint_pos[2] = new_joint3
-        #
-        #     # 移动机械臂到新的目标位置，并启用阻塞模式
-        #     print("Moving to new joint position with Z+10 (blocking mode):")
-        #     moveByJoint(sock, new_joint_pos, speed=30, block=True)
-
-        # 执行直线匀速运动
         i = 0
         while True:
             if i > 10:

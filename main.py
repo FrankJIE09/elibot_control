@@ -2,6 +2,9 @@ import socket
 import json
 import time
 
+import cv2
+import numpy as np
+
 
 # 连接到机器人控制器
 def connectETController(ip, port=8055):
@@ -161,9 +164,37 @@ def moveByJoint(sock, targetPos, speed, block=True):
                     break
                 else:
                     print("1Robot is still moving...")
-                    time.sleep(1)  # 每1秒检查一次，避免过多的请求
+                    time.sleep(0.1)  # 每1秒检查一次，避免过多的请求
     else:
         print("Failed to send move command.")
+
+
+# 直线运动（阻塞模式）
+def moveByLine(sock, point):
+    # 发送直线运动命令
+    suc, result, _ = sendCMD(sock, "moveByLine", {
+        "targetPos": point,
+        "speed_type": 0,
+        "speed": 200,
+        "cond_type": 0,
+        "cond_num": 7,
+        "cond_value": 1
+    })
+
+    if suc:
+        print(f"Line movement command sent to {point}")
+
+        # 阻塞等待直到机器人到达目标点
+        while True:
+            suc, result, _ = sendCMD(sock, "getRobotState")
+            if suc and result == "0":  # 0表示机器人已停止
+                print(f"Robot reached target point: {point}")
+                break
+            else:
+                print("Robot is still moving...")
+                time.sleep(0.1)  # 每秒检查一次状态
+    else:
+        print(f"Failed to send line movement command to {point}")
 
 
 def moveByPath(sock):
@@ -179,23 +210,29 @@ def addPathPoint(sock, wayPoint, moveType=0, speed=50, circular_radius=0):
     return sendCMD(sock, "addPathPoint", params)
 
 
+def moveBySpeedl(sock, speed_l, acc, arot, t, id=1):
+    params = {"v": speed_l, "acc": acc, "arot": arot, "t": t}
+    return sendCMD(sock, "moveBySpeedl", params, id)
+
+
 ### 示例：执行所有API ###
-def main():
-    robot_ip = "192.168.11.6"  # 机器人IP地址
+# 示例：执行所有API
+def main2():
+    robot_ip = "192.168.11.8"  # 机器人IP地址
     conSuc, sock = connectETController(robot_ip)
 
     if conSuc:
         print("Connected to robot controller.")
 
         # 获取机器人当前伺服状态
-        suc, servo_status, _ = getServoStatus(sock)
+        suc, servo_status, _ = sendCMD(sock, "getServoStatus")
         if suc:
             print("Current Servo Status:", servo_status)
 
             # 如果伺服没有启用，设置伺服为开启状态
             if servo_status == "false" or servo_status == "0":
                 print("Enabling servo...")
-                suc, result, _ = setServoStatus(sock, 1)  # 1表示启用伺服
+                suc, result, _ = sendCMD(sock, "set_servo_status", {"status": 1})  # 1表示启用伺服
                 if suc:
                     print("Servo enabled successfully.")
                 else:
@@ -204,29 +241,150 @@ def main():
             else:
                 print("Servo is already enabled.")
 
-        # 获取机器人当前关节位置
-        suc, joint_pos, _ = getJointPos(sock)
+        # 获取机器人当前TCP位置
+        suc, joint_pos, _ = sendCMD(sock, "getTcpPose")
         if suc:
             print("Current Joint Position:", joint_pos)
 
             # 确保 joint_pos 是列表类型
             if isinstance(joint_pos, str):
                 joint_pos = json.loads(joint_pos)
-
-            # 获取当前位置的Z轴坐标并确保它是一个数字类型（float）
-            joint3 = float(joint_pos[2])  # 假设 joint_pos 是 [x, y, z, rx, ry, rz]
+            # joint_pos = np.array(joint_pos)
+            # joint_pos[3:] = np.rad2deg(joint_pos[3:])
+            # joint_pos = joint_pos.tolist()
+            joint3 = float(joint_pos[2])
 
             # 增加Z轴10
-            new_joint3 = joint3 + 10
+            new_joint3 = joint3
             print(f"Moving joint3 from {joint3} to {new_joint3}")
 
             # 创建新的目标位置，将Z轴增加10
             new_joint_pos = joint_pos.copy()  # 使用copy()来生成新的列表
             new_joint_pos[2] = new_joint3
-
+            suc, result, _ = sendCMD(sock, "inverseKinematic", {
+                "targetPose": new_joint_pos,
+                "referencePos": "P000"
+            })
             # 移动机械臂到新的目标位置，并启用阻塞模式
             print("Moving to new joint position with Z+10 (blocking mode):")
-            moveByJoint(sock, new_joint_pos, speed=30, block=True)
+
+            # 进行直线运动
+            print("Starting line movements...")
+            moveByLine(sock, new_joint_pos)
+
+        # 断开连接
+        disconnectETController(sock)
+    else:
+        print("Failed to connect to robot controller.")
+
+
+def keyboardControl(sock):
+    # 创建窗口
+    cv2.namedWindow('Robot Control', cv2.WINDOW_NORMAL)
+
+    # 初始化速度为0
+    speed = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # [X, Y, Z, Roll, Pitch, Yaw]
+
+    # 定义不同轴的速度变化步长
+    step_size_xyz = 10  # XYZ轴的步长
+    step_size_rpy = 2  # RPY（Roll, Pitch, Yaw）轴的步长
+
+    acc = 100  # 加速度
+    arot = 10  # 姿态加速度
+    t = 0.1  # 执行时间
+
+    while True:
+        # 显示当前速度
+        img = np.zeros((300, 600, 3), dtype=np.uint8)
+        cv2.putText(img, f"Speed: {speed}", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(img, "Control Keys:", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(img, "'w'/'s' -> X-axis", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(img, "'a'/'d' -> Y-axis", (50, 130), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(img, "'q'/'e' -> Z-axis", (50, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(img, "'r'/'f' -> Roll (R)", (50, 190), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(img, "'t'/'g' -> Pitch (P)", (50, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(img, "'y'/'h' -> Yaw (Y)", (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(img, "Press 'Esc' to exit", (50, 280), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+        cv2.imshow('Robot Control', img)
+
+        # 等待用户输入
+        key = cv2.waitKey(100) & 0xFF
+        speed = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # [X, Y, Z, Roll, Pitch, Yaw]
+
+        # 控制XYZ速度
+        if key == ord('w'):  # X轴正向
+            speed[0] = step_size_xyz
+        if key == ord('s'):  # X轴负向
+            speed[0] = -step_size_xyz
+        if key == ord('a'):  # Y轴负向
+            speed[1] = -step_size_xyz
+        if key == ord('d'):  # Y轴正向
+            speed[1] = step_size_xyz
+        if key == ord('q'):  # Z轴正向
+            speed[2] = step_size_xyz
+        if key == ord('e'):  # Z轴负向
+            speed[2] = -step_size_xyz
+
+        # 控制RPY速度
+        if key == ord('r'):  # Roll正向
+            speed[3] = step_size_rpy
+        if key == ord('f'):  # Roll负向
+            speed[3] = -step_size_rpy
+        if key == ord('t'):  # Pitch正向
+            speed[4] = step_size_rpy
+        if key == ord('g'):  # Pitch负向
+            speed[4] = -step_size_rpy
+        if key == ord('y'):  # Yaw正向
+            speed[5] = step_size_rpy
+        if key == ord('h'):  # Yaw负向
+            speed[5] = -step_size_rpy
+
+        # 更新速度
+        print(f"Current Speed: {speed}")
+
+        # 发送速度命令到机器人
+        suc, result, _ = moveBySpeedl(sock, list(speed), acc, arot, t)
+        if suc:
+            print("Movement command sent successfully.")
+        else:
+            print("Failed to send movement command.")
+
+        # 按Esc键退出
+        if key == 27:
+            break
+
+    # 关闭窗口
+    cv2.destroyAllWindows()
+
+
+# 示例：执行所有API
+def main():
+    robot_ip = "192.168.11.8"  # 机器人IP地址
+    conSuc, sock = connectETController(robot_ip)
+
+    if conSuc:
+        print("Connected to robot controller.")
+
+        # 获取机器人当前伺服状态
+        suc, servo_status, _ = sendCMD(sock, "getServoStatus")
+        if suc:
+            print("Current Servo Status:", servo_status)
+
+            # 如果伺服没有启用，设置伺服为开启状态
+            if servo_status == "false" or servo_status == "0":
+                print("Enabling servo...")
+                suc, result, _ = sendCMD(sock, "set_servo_status", {"status": 1})  # 1表示启用伺服
+                if suc:
+                    print("Servo enabled successfully.")
+                else:
+                    print("Failed to enable servo.")
+                    return
+            else:
+                print("Servo is already enabled.")
+
+        # 使用键盘控制机器人
+        keyboardControl(sock)
 
         # 断开连接
         disconnectETController(sock)
@@ -235,4 +393,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+
+    main2()
