@@ -53,7 +53,7 @@ class RobotController:
             joint_pose = json.loads(joint_pose)
         return joint_pose
 
-    def getTcpPose(self, unit_type=0):
+    def getTcpPos(self, unit_type=0):
         params = {"unit_type": unit_type}
         suc, result_pose, _ = self.sendCMD("getTcpPose", params=params)
         if isinstance(result_pose, str):
@@ -91,14 +91,33 @@ class RobotController:
         iK_joint = self.inverseKinematic(target_pose)
         self.moveByJoint(iK_joint, speed=10)
 
+    def alignZAxis(self):
+        # Get the current TCP pose
+        current_pose = self.read_pos()
+
+        # Define a target pose with the desired orientation for Z-axis alignment
+        # Here, we assume the orientation is given as Euler angles in degrees
+        target_pose = {
+            "position": current_pose["position"],  # Keep the current position
+            "orientation": [180, 0, 0]  # Set orientation to align the Z-axis
+        }
+
+        # Convert target orientation to the robot's required format if needed
+        # This might involve converting Euler angles to quaternions, etc., depending on the robot
+
+        # Calculate the joint positions needed to achieve this pose
+        iK_joint = self.inverseKinematic(target_pose)
+
+        # Move to the calculated joint positions
+        self.moveByJoint(iK_joint, speed=10)
 
 if __name__ == "__main__":
     robot_ip = "192.168.11.8"
     controller = RobotController(robot_ip)
     if controller.connect():
-        print(controller.getTcpPose())
+        print(controller.getTcpPos())
         print(controller.getJointPos())
-        pose = controller.getTcpPose()
+        pose = controller.getTcpPos()
         pose[2] = pose[2] + 10
         print(controller.inverseKinematic(targetPose=pose))
         controller.moveLine(pose)

@@ -3,7 +3,7 @@ import json
 import time
 
 
-class RobotController:
+class CPSClient:
     def __init__(self, ip, port=8055):
         self.ip = ip
         self.port = port
@@ -53,7 +53,7 @@ class RobotController:
             joint_pose = json.loads(joint_pose)
         return joint_pose
 
-    def getTcpPose(self, unit_type=0):
+    def read_pos(self, unit_type=0):
         params = {"unit_type": unit_type}
         suc, result_pose, _ = self.sendCMD("getTcpPose", params=params)
         if isinstance(result_pose, str):
@@ -87,18 +87,31 @@ class RobotController:
             iK_joint = json.loads(iK_joint)
         return iK_joint
 
-    def moveLine(self, target_pose):
+    def move_robot(self, target_pose, speed=10):
         iK_joint = self.inverseKinematic(target_pose)
+        self.moveByJoint(iK_joint, speed=speed)
+
+    def alignZAxis(self):
+        # Get the current TCP pose
+        current_pose = self.read_pos()
+        current_pose[3:] = [180, 0, 0]
+        target_pose = current_pose
+
+        # Calculate the joint positions needed to achieve this pose
+        iK_joint = self.inverseKinematic(target_pose)
+
+        # Move to the calculated joint positions
         self.moveByJoint(iK_joint, speed=10)
 
 
 if __name__ == "__main__":
     robot_ip = "192.168.11.8"
-    controller = RobotController(robot_ip)
+    controller = CPSClient(robot_ip)
     if controller.connect():
-        print(controller.getTcpPose())
+        print(controller.read_pos())
         print(controller.getJointPos())
-        pose = controller.getTcpPose()
+        pose = controller.read_pos()
         pose[2] = pose[2] + 10
-        print(controller.inverseKinematic(targetPose=pose))
-        controller.moveLine(pose)
+        # print(controller.inverseKinematic(targetPose=pose))
+        # controller.move_robot(pose)
+        controller.alignZAxis()
