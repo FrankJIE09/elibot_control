@@ -12,7 +12,6 @@ class CPSClient:
         if not ret == True:
             RuntimeError
 
-
     def connect(self):
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -59,10 +58,31 @@ class CPSClient:
 
     def getTcpPos(self, unit_type=0):
         params = {"unit_type": unit_type}
-        suc, result_pose, _ = self.sendCMD("getTcpPose", params=params)
+        suc, result_pose, _ = self.sendCMD("get_tcp_pose", params=params)
         if isinstance(result_pose, str):
             result_pose = json.loads(result_pose)
         return result_pose
+
+    def getToolTcpPos(self, unit_type=0):
+        params = {"tool_num": 0, "unit_type": unit_type, }
+        suc, result_pose, _ = self.sendCMD("get_tcp_pose", params=params)
+        if isinstance(result_pose, str):
+            result_pose = json.loads(result_pose)
+        return result_pose
+
+    def moveByLine(self, targetPos, speed, block=True):
+        suc, result, _ = self.sendCMD("moveByLine", {"targetPos": targetPos, "speed": speed})
+        if suc:
+            print(f"Move command sent: Target position {targetPos} with speed {speed}")
+            if block:
+                while True:
+                    _, state, _ = self.sendCMD("getRobotState")
+                    if state == '0':  # Assuming '0' means the robot has stopped
+                        print("Robot reached the target position.")
+                        break
+                    time.sleep(0.1)
+        else:
+            print("Failed to send move command.")
 
     def moveByJoint(self, targetPos, speed, block=True):
 
@@ -95,7 +115,7 @@ class CPSClient:
 
     def moveLine(self, target_pose):
         iK_joint = self.inverseKinematic(target_pose)
-        self.moveByJoint(iK_joint, speed=10)
+        self.moveByLine(iK_joint, speed=10)
 
     def alignZAxis(self):
         # Get the current TCP pose
@@ -112,11 +132,13 @@ class CPSClient:
         iK_joint = self.inverseKinematic(target_pose)
 
         # Move to the calculated joint positions
-        self.moveByJoint(iK_joint, speed=10)
+        self.moveByLine(iK_joint, speed=5)
 
 
 if __name__ == "__main__":
     robot_ip = "192.168.11.8"
     controller = CPSClient(robot_ip)
     if controller.connect():
-        controller.alignZAxis()
+        print(controller.getToolTcpPos())
+        print(controller.getTcpPos())
+        # controller.alignZAxis()
