@@ -287,7 +287,7 @@ def keyboardControl(sock):
 
     # 定义不同轴的速度变化步长
     step_size_xyz = 40  # XYZ轴的步长
-    step_size_rpy = 2  # RPY（Roll, Pitch, Yaw）轴的步长
+    step_size_rpy = 20  # RPY（Roll, Pitch, Yaw）轴的步长
 
     acc = 100  # 加速度
     arot = 10  # 姿态加速度
