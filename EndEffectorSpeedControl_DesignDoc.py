@@ -4,6 +4,7 @@ import time
 
 import cv2
 import numpy as np
+from Jacobian.object_2_joint_velocity_elibot import calculate_joint_velocity
 
 
 # 连接到机器人控制器
@@ -196,6 +197,7 @@ def moveByLine(sock, point):
     else:
         print(f"Failed to send line movement command to {point}")
 
+
 def get_all_dh(sock, num_parameters):
     """
     获取所有DH参数
@@ -215,6 +217,7 @@ def get_all_dh(sock, num_parameters):
 
     return all_dh_parameters
 
+
 def moveByPath(sock):
     return sendCMD(sock, "moveByPath")
 
@@ -231,6 +234,11 @@ def addPathPoint(sock, wayPoint, moveType=0, speed=50, circular_radius=0):
 def moveBySpeedl(sock, speed_l, acc, arot, t, id=1):
     params = {"v": speed_l, "acc": acc, "arot": arot, "t": t}
     return sendCMD(sock, "moveBySpeedl", params, id)
+
+
+def moveBySpeedj(sock, speed_j, acc=20, t=0.01, id=1):
+    params = {"vj": speed_j, "acc": acc, "t": t}
+    return sendCMD(sock, "moveBySpeedj", params, id)
 
 
 ### 示例：执行所有API ###
@@ -304,8 +312,8 @@ def keyboardControl(sock):
     speed = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # [X, Y, Z, Roll, Pitch, Yaw]
 
     # 定义不同轴的速度变化步长
-    step_size_xyz = 40  # XYZ轴的步长
-    step_size_rpy = 2  # RPY（Roll, Pitch, Yaw）轴的步长
+    step_size_xyz = 3  # XYZ轴的步长
+    step_size_rpy = 3  # RPY（Roll, Pitch, Yaw）轴的步长
 
     acc = 100  # 加速度
     arot = 10  # 姿态加速度
@@ -327,7 +335,7 @@ def keyboardControl(sock):
         cv2.imshow('Robot Control', img)
 
         # 等待用户输入
-        key = cv2.waitKey(100) & 0xFF
+        key = cv2.waitKey(2000) & 0xFF
         speed = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # [X, Y, Z, Roll, Pitch, Yaw]
 
         # 控制XYZ速度
@@ -357,12 +365,15 @@ def keyboardControl(sock):
             speed[5] = step_size_rpy
         if key == ord('h'):  # Yaw负向
             speed[5] = -step_size_rpy
-
         # 更新速度
         print(f"Current Speed: {speed}")
+        suc, theta, _ = getJointPos(sock)
+        theta = eval(theta)
 
+        speedj = calculate_joint_velocity(speed, theta)
+        speedj = speedj / 10
         # 发送速度命令到机器人
-        suc, result, _ = moveBySpeedl(sock, list(speed), acc, arot, t)
+        suc, result, _ = moveBySpeedj(sock, list(speedj), acc, t)
         if suc:
             print("Movement command sent successfully.")
         else:
@@ -411,5 +422,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()
