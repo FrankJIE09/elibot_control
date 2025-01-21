@@ -367,8 +367,8 @@ def keyboardControl(sock):
             speed[5] = -step_size_rpy
         # 更新速度
         suc, theta, _ = getJointPos(sock)
-        theta = np.deg2rad(eval(theta))
-        print(theta)
+        theta = eval(theta)
+
         speedj = calculate_joint_velocity(speed, theta)
         speedj = speedj / 10
         print(f"Current Speed: {speedj}")
