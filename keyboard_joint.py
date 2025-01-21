@@ -236,7 +236,8 @@ def moveBySpeedl(sock, speed_l, acc, arot, t, id=1):
     return sendCMD(sock, "moveBySpeedl", params, id)
 
 
-def moveBySpeedj(sock, speed_j, acc=20, t=0.01, id=1):
+def moveBySpeedj(sock, speed_j, acc=20, t=0.1, id=1):
+    print(speed_j)
     params = {"vj": speed_j, "acc": acc, "t": t}
     return sendCMD(sock, "moveBySpeedj", params, id)
 
@@ -312,10 +313,10 @@ def keyboardControl(sock):
     speed = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # [X, Y, Z, Roll, Pitch, Yaw]
 
     # 定义不同轴的速度变化步长
-    step_size_xyz = 3  # XYZ轴的步长
+    step_size_xyz = 0.003  # XYZ轴的步长
     step_size_rpy = 3  # RPY（Roll, Pitch, Yaw）轴的步长
 
-    acc = 100  # 加速度
+    acc = 10  # 加速度
     arot = 10  # 姿态加速度
     t = 0.1  # 执行时间
 
@@ -369,7 +370,7 @@ def keyboardControl(sock):
         print(f"Current Speed: {speed}")
         suc, theta, _ = getJointPos(sock)
         theta = np.deg2rad(eval(theta))
-        print(theta)
+        # print(theta)
         # 发送速度7令到机器人
         suc, result, _ = moveBySpeedj(sock, list(speed), acc, t)
         if suc:

@@ -237,6 +237,9 @@ def moveBySpeedl(sock, speed_l, acc, arot, t, id=1):
 
 
 def moveBySpeedj(sock, speed_j, acc=20, t=0.01, id=1):
+    # 修改数组中绝对值小于1的元素为0
+    # speed_j = [x if abs(x) >= 1 else 0 for x in speed_j]
+    # print(speed_j)
     params = {"vj": speed_j, "acc": acc, "t": t}
     return sendCMD(sock, "moveBySpeedj", params, id)
 
@@ -370,7 +373,7 @@ def keyboardControl(sock):
         theta = np.deg2rad(eval(theta))
         print(theta)
         speedj = calculate_joint_velocity(speed, theta)
-        speedj = speedj / 10
+        speedj = speedj
         print(f"Current Speed: {speedj}")
 
         # 发送速度命令到机器人
