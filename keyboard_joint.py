@@ -370,9 +370,7 @@ def keyboardControl(sock):
         suc, theta, _ = getJointPos(sock)
         theta = np.deg2rad(eval(theta))
         print(theta)
-        speedj = calculate_joint_velocity(speed, theta)
-        speed = speedj / 10
-        # 发送速度命令到机器人
+        # 发送速度7令到机器人
         suc, result, _ = moveBySpeedj(sock, list(speed), acc, t)
         if suc:
             print("Movement command sent successfully.")
